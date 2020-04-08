@@ -1,3 +1,5 @@
+# rating file format: userID,ISBN,rating
+
 import os
 import csv
 import sys
@@ -12,8 +14,8 @@ import pandas as pd
 
 class BooksData:
 
-    bookID_to_name = {}
-    name_to_bookID = {}
+    ISBN_to_title = {}
+    title_to_ISBN = {}
     ratingsPath = 'data/ratings.csv'
     Books = 'data/books.csv'
     
@@ -52,15 +54,15 @@ class BooksData:
     def getPopularityRanks(self):
         ratings = defaultdict(int)
         rankings = defaultdict(int)
-        with open(self.ratingsPath, newline='') as csvfile:
+        with open(self.ratingsPath, newline='\n') as csvfile:
             ratingReader = csv.reader(csvfile)
             next(ratingReader)
             for row in ratingReader:
-                ISBN = row[0]
+                ISBN = row[1]
                 ratings[ISBN] += 1
         rank = 1
-        for movieID, ratingCount in sorted(ratings.items(), key=lambda x: x[1], reverse=True):
-            rankings[movieID] = rank
+        for bookID, ratingCount in sorted(ratings.items(), key=lambda x: x[1], reverse=True):
+            rankings[bookID] = rank
             rank += 1
         return rankings
     
