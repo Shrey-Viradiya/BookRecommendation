@@ -56,8 +56,8 @@ class BooksData:
             ratingReader = csv.reader(csvfile)
             next(ratingReader)
             for row in ratingReader:
-                movieID = int(row[1])
-                ratings[movieID] += 1
+                ISBN = row[0]
+                ratings[ISBN] += 1
         rank = 1
         for movieID, ratingCount in sorted(ratings.items(), key=lambda x: x[1], reverse=True):
             rankings[movieID] = rank
