@@ -1,63 +1,68 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu May  3 11:11:13 2018
-
-@author: Frank
-"""
-
 from models.BooksData import BooksData
-from surprise import SVD
-from surprise import NormalPredictor
-from models.Evaluator import Evaluator
-from surprise.model_selection import GridSearchCV
-
-import random
+from surprise import KNNBasic
 import numpy as np
+import heapq
+from collections import defaultdict
+from operator import itemgetter
+
+testSubject = '265115'
+k = 10
+
+# Load our data set and compute the user similarity matrix
+bk = BooksData()
+data = bk.loadBooksData()
+
+trainSet = data.build_full_trainset()
+
+sim_options = {'name': 'cosine',
+               'user_based': True
+               }
+
+model = KNNBasic(sim_options=sim_options)
+model.fit(trainSet)
+simsMatrix = model.compute_similarities()
+
+simsMatrix = np.nan_to_num(simsMatrix)
+
+print(simsMatrix)
+print(type(simsMatrix))
+
+# Get top N similar users to our test subject
+testUserInnerID = trainSet.to_inner_uid(testSubject)
+similarityRow = simsMatrix[testUserInnerID]
+
+similarUsers = []
+for innerID, score in enumerate(similarityRow):
+    if innerID != testUserInnerID:
+        similarUsers.append((innerID, score))
+
+print(similarUsers)
+
+kNeighbors = heapq.nlargest(k, similarUsers, key=lambda t: t[1])
+
+# Get the stuff they rated, and add up ratings for each item, weighted by user similarity
+candidates = defaultdict(float)
+for similarUser in kNeighbors:
+    innerID = similarUser[0]
+    userSimilarityScore = similarUser[1]
+    theirRatings = trainSet.ur[innerID]
+    for rating in theirRatings:
+        candidates[rating[0]] += (rating[1] / 10.0) * userSimilarityScore
+
+# Build a dictionary of stuff the user has already read
+read = {}
+for itemID, rating in trainSet.ur[testUserInnerID]:
+    read[itemID] = 1
+
+# Get top-rated items from similar users:
+pos = 0
+for itemID, ratingSum in sorted(candidates.items(), key=itemgetter(1), reverse=True):
+    if not itemID in read:
+        bookID = trainSet.to_raw_iid(itemID)
+        print(bk.getBookName(bookID), ratingSum)
+        pos += 1
+        if (pos > 10):
+            break
 
 
-def LoadBookDataBX():
-    bk = BooksData()
-    print("Loading book ratings...")
-    data = bk.loadBooksData()
-    print("\nComputing book popularity ranks so we can measure novelty later...")
-    rank_dict = bk.getPopularityRanks()
-    return (bk, data, rank_dict)
 
-
-np.random.seed(0)
-random.seed(0)
-
-# Load up common data set for the recommender algorithms
-(bk, evaluationData, rankings) = LoadBookDataBX()
-
-print("Searching for best parameters...")
-param_grid = {'n_epochs': [20, 30], 'lr_all': [0.005, 0.010],
-              'n_factors': [50, 100]}
-gs = GridSearchCV(SVD, param_grid, measures=['rmse', 'mae'], cv=3)
-
-gs.fit(evaluationData)
-
-# best RMSE score
-print("Best RMSE score attained: ", gs.best_score['rmse'])
-
-# combination of parameters that gave the best RMSE score
-print(gs.best_params['rmse'])
-
-# Construct an Evaluator to, you know, evaluate them
-evaluator = Evaluator(evaluationData, rankings)
-
-params = gs.best_params['rmse']
-SVDtuned = SVD(n_epochs=params['n_epochs'], lr_all=params['lr_all'], n_factors=params['n_factors'])
-evaluator.AddAlgorithm(SVDtuned, "SVD - Tuned")
-
-SVDUntuned = SVD()
-evaluator.AddAlgorithm(SVDUntuned, "SVD - Untuned")
-
-# Just make random recommendations
-Random = NormalPredictor()
-evaluator.AddAlgorithm(Random, "Random")
-
-# Fight!
-evaluator.Evaluate(False)
-
-evaluator.SampleTopNRecs(bk)
