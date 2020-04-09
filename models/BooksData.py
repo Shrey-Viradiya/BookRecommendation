@@ -16,8 +16,8 @@ import numpy as np
 class BooksData:
     ISBN_to_title = {}
     title_to_ISBN = {}
-    ratingsPath = 'data/ratings.csv'
-    Books = 'data/books.csv'
+    ratingsPath = 'data_100/ratings.csv'
+    Books = 'data_100/books.csv'
 
     def loadBooksData(self):
 
